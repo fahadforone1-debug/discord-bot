@@ -710,10 +710,10 @@ async def on_command_error(ctx, error):
         await ctx.send(f"❌ معطى خاطئ. استخدم `!help_welcome` للمساعدة")
 
 # اقرأ المتغير من ملف .env أو متغيرات البيئة
-TOKEN = os.getenv("DISCORD_TOKEN") or os.getenv("TOKEN")
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 if not TOKEN:
-    print("❌ Environment variable DISCORD_TOKEN or TOKEN is missing")
+    print("❌ Environment variable DISCORD_TOKEN is missing")
     raise SystemExit(1)
 
 bot.run(TOKEN)
