@@ -4,6 +4,8 @@ import datetime
 import json
 from dotenv import load_dotenv; load_dotenv()
 import os
+import time
+import asyncio
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -21,6 +23,9 @@ DEVELOPER_ID = 941670030494531584  # ضع معرف حسابك في ديسكور�
 
 # رابط GIF افتراضي
 DEFAULT_GIF_URL = "https://media.discordapp.net/attachments/1264550914056786002/1408009869537054810/bannner.gif?ex=68df8de0&is=68de3c60&hm=81d203da5070347b954bd9f247529dc2b003729cd540d023d33e657dc0a8c4fd&=&width=940&height=528"
+
+# نظام منع التكرار السريع (Rate Limiting)
+last_command_time = {}
 
 def save_welcome_settings(guild_id, channel_id, message, embed_color=0x00bfff, gif_url=None):
     if os.path.exists(WELCOME_SETTINGS_FILE):
@@ -43,6 +48,21 @@ def get_welcome_settings(guild_id):
             data = json.load(f)
         return data.get(str(guild_id))
     return None
+
+def check_rate_limit(user_id, command_name, cooldown_seconds=5):
+    """
+    التحقق من rate limiting لمنع التكرار السريع
+    """
+    current_time = time.time()
+    key = f"{user_id}_{command_name}"
+    
+    if key in last_command_time:
+        time_diff = current_time - last_command_time[key]
+        if time_diff < cooldown_seconds:
+            return False, int(cooldown_seconds - time_diff) + 1
+    
+    last_command_time[key] = current_time
+    return True, 0
 
 @bot.event
 async def on_ready():
@@ -122,6 +142,17 @@ async def setup_welcome(ctx, channel: discord.TextChannel, *, message: str):
     إعداد نظام الترحيب
     مثال: !setup_welcome #welcome مرحباً {user} في {guild}! أنت العضو رقم {count}
     """
+    # التحقق من rate limiting لمنع التكرار السريع
+    can_use, wait_time = check_rate_limit(ctx.author.id, "setup_welcome", 10)
+    if not can_use:
+        embed = discord.Embed(
+            title="⏰ يرجى الانتظار",
+            description=f"يرجى الانتظار {wait_time} ثانية قبل استخدام هذا الأمر مرة أخرى",
+            color=0xffaa00
+        )
+        await ctx.send(embed=embed, delete_after=5)
+        return
+    
     save_welcome_settings(ctx.guild.id, channel.id, message)
     
     embed = discord.Embed(
@@ -144,6 +175,25 @@ async def setup_welcome(ctx, channel: discord.TextChannel, *, message: str):
         value=f"تم تعيين GIF افتراضي. يمكنك تغييره بأمر `!welcome_gif <رابط>`",
         inline=False
     )
+    embed.add_field(
+        name="⚠️ تنبيه:",
+        value="إذا كان البوت يرسل رسائل مكررة، استخدم `!reload_settings` لإعادة التشغيل",
+        inline=False
+    )
+    
+    # إضافة معلومات المطور
+    try:
+        developer = bot.get_user(DEVELOPER_ID) or await bot.fetch_user(DEVELOPER_ID)
+        embed.set_footer(
+            text=f"💻 تم تطوير البوت بواسطة {developer.display_name}",
+            icon_url=developer.display_avatar.url
+        )
+    except:
+        embed.set_footer(
+            text=f"💻 تم تطوير البوت بواسطة {DEVELOPER_NAME}",
+            icon_url="https://cdn.discordapp.com/embed/avatars/0.png"
+        )
+    
     await ctx.send(embed=embed)
 
 @bot.command()
@@ -276,9 +326,59 @@ async def test_welcome(ctx, member: discord.Member = None):
         await ctx.send("❌ يجب إعداد نظام الترحيب أولاً باستخدام `!setup_welcome`")
         return
     
-    # محاكاة حدث انضمام عضو
-    await on_member_join(member)
-    await ctx.send(f"✅ تم إرسال رسالة ترحيب تجريبية لـ {member.mention}")
+    welcome_channel = ctx.guild.get_channel(settings["channel_id"])
+    if not welcome_channel:
+        await ctx.send("❌ قناة الترحيب غير موجودة")
+        return
+    
+    # إنشاء embed الاختبار (نسخة مبسطة من on_member_join)
+    embed = discord.Embed(
+        title=f"🧪 Test Welcome - {member.guild.name}!",
+        description=settings["message"].replace("{user}", member.mention).replace("{guild}", member.guild.name).replace("{count}", str(member.guild.member_count)),
+        color=settings.get("embed_color", 0x00bfff)
+    )
+    
+    # معلومات العضو
+    embed.add_field(name="👤 Username", value=f"{member.name}#{member.discriminator}", inline=True)
+    embed.add_field(name="🆔 User ID", value=member.id, inline=True)
+    embed.add_field(name="📅 Account Created", value=member.created_at.strftime("%Y-%m-%d"), inline=True)
+    
+    # معلومات السيرفر
+    embed.add_field(name="👥 Member Count", value=member.guild.member_count, inline=True)
+    embed.add_field(name="🏆 You're Member", value=f"#{member.guild.member_count}", inline=True)
+    embed.add_field(name="🌟 Join Method", value="Test Mode", inline=True)
+    
+    # صورة العضو
+    embed.set_thumbnail(url=member.display_avatar.url)
+    
+    # إضافة GIF
+    gif_url = settings.get("gif_url", DEFAULT_GIF_URL)
+    if gif_url:
+        embed.set_image(url=gif_url)
+    
+    # صورة السيرفر
+    if member.guild.icon:
+        embed.set_author(name=member.guild.name, icon_url=member.guild.icon.url)
+    
+    # Footer للاختبار
+    current_time = datetime.datetime.now()
+    try:
+        developer = bot.get_user(DEVELOPER_ID) or await bot.fetch_user(DEVELOPER_ID)
+        embed.set_footer(
+            text=f"🧪 TEST MODE - Powered By {developer.display_name} • {current_time.strftime('%I:%M%p').lower()}", 
+            icon_url=developer.display_avatar.url
+        )
+    except:
+        embed.set_footer(
+            text=f"🧪 TEST MODE - Powered By {DEVELOPER_NAME} • {current_time.strftime('%I:%M%p').lower()}", 
+            icon_url="https://cdn.discordapp.com/embed/avatars/0.png"
+        )
+    
+    try:
+        await welcome_channel.send(embed=embed)
+        await ctx.send(f"✅ تم إرسال رسالة ترحيب تجريبية لـ {member.mention} في {welcome_channel.mention}")
+    except Exception as e:
+        await ctx.send(f"❌ خطأ في إرسال رسالة الاختبار: {e}")
 
 @bot.command()
 async def welcome_info(ctx):
@@ -479,6 +579,66 @@ async def reload_settings(ctx):
         await ctx.send(f"❌ خطأ في إعادة تحميل الإعدادات: {e}")
 
 @bot.command()
+@commands.has_permissions(administrator=True)  
+async def clear_duplicates(ctx, limit: int = 50):
+    """
+    مسح الرسائل المكررة من البوت في القناة الحالية
+    مثال: !clear_duplicates 20
+    """
+    try:
+        deleted = 0
+        bot_messages = []
+        
+        # جلب آخر الرسائل في القناة
+        async for message in ctx.channel.history(limit=limit):
+            if message.author == bot.user:
+                bot_messages.append(message)
+        
+        # البحث عن الرسائل المكررة
+        seen_contents = set()
+        to_delete = []
+        
+        for message in bot_messages:
+            if message.embeds:
+                embed_title = message.embeds[0].title if message.embeds[0].title else ""
+                embed_desc = message.embeds[0].description if message.embeds[0].description else ""
+                content_key = f"{embed_title}|{embed_desc}"
+                
+                if content_key in seen_contents and content_key.strip():
+                    to_delete.append(message)
+                else:
+                    seen_contents.add(content_key)
+        
+        # حذف الرسائل المكررة
+        for message in to_delete:
+            try:
+                await message.delete()
+                deleted += 1
+                await asyncio.sleep(0.5)  # تجنب rate limit
+            except:
+                pass
+        
+        if deleted > 0:
+            embed = discord.Embed(
+                title="🧹 تم مسح الرسائل المكررة",
+                description=f"تم حذف {deleted} رسالة مكررة",
+                color=0x00ff00
+            )
+            msg = await ctx.send(embed=embed)
+            await msg.delete(delay=5)  # حذف الرسالة بعد 5 ثوان
+        else:
+            embed = discord.Embed(
+                title="✅ لا توجد رسائل مكررة",
+                description="لم يتم العثور على رسائل مكررة لحذفها",
+                color=0x00bfff
+            )
+            msg = await ctx.send(embed=embed)
+            await msg.delete(delay=3)
+            
+    except Exception as e:
+        await ctx.send(f"❌ خطأ في مسح الرسائل: {e}")
+
+@bot.command()
 async def help_welcome(ctx):
     """
     عرض مساعدة أوامر نظام الترحيب
@@ -498,6 +658,7 @@ async def help_welcome(ctx):
         ("!welcome_info", "عرض الإعدادات الحالية"),
         ("!disable_welcome", "تعطيل نظام الترحيب"),
         ("!reload_settings", "إعادة تحميل الإعدادات"),
+        ("!clear_duplicates [عدد]", "مسح الرسائل المكررة"),
         ("!bot_stats", "عرض إحصائيات البوت"),
         ("!developer", "عرض معلومات مطور البوت"),
         ("!help_welcome", "عرض هذه المساعدة")
