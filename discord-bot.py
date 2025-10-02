@@ -319,7 +319,7 @@ async def test_welcome(ctx, member: discord.Member = None):
     مثال: !test_welcome @عضو
     """
     # التحقق من rate limiting لمنع التكرار السريع
-    can_use, wait_time = check_rate_limit(ctx.author.id, "test_welcome", 5)
+    can_use, wait_time = check_rate_limit(ctx.author.id, "test_welcome", 15)
     if not can_use:
         embed = discord.Embed(
             title="⏰ يرجى الانتظار",
@@ -372,25 +372,27 @@ async def test_welcome(ctx, member: discord.Member = None):
     if member.guild.icon:
         embed.set_author(name=member.guild.name, icon_url=member.guild.icon.url)
     
-    # Footer للاختبار
+    # Footer (نفس الترحيب الأصلي)
     current_time = datetime.datetime.now()
     try:
         developer = bot.get_user(DEVELOPER_ID) or await bot.fetch_user(DEVELOPER_ID)
         embed.set_footer(
-            text=f"🧪 TEST MODE - Powered By {developer.display_name} • {current_time.strftime('%I:%M%p').lower()}", 
+            text=f"Powered By {developer.display_name} • Today at {current_time.strftime('%I:%M%p').lower()}", 
             icon_url=developer.display_avatar.url
         )
     except:
         embed.set_footer(
-            text=f"🧪 TEST MODE - Powered By {DEVELOPER_NAME} • {current_time.strftime('%I:%M%p').lower()}", 
+            text=f"Powered By {DEVELOPER_NAME} • Today at {current_time.strftime('%I:%M%p').lower()}", 
             icon_url="https://cdn.discordapp.com/embed/avatars/0.png"
         )
     
     try:
         await welcome_channel.send(embed=embed)
-        await ctx.send(f"✅ تم إرسال رسالة ترحيب تجريبية لـ {member.mention} في {welcome_channel.mention}")
+        confirmation = await ctx.send(f"✅ تم إرسال رسالة ترحيب تجريبية لـ {member.mention} في {welcome_channel.mention}")
+        await confirmation.delete(delay=8)  # حذف رسالة التأكيد بعد 8 ثوان
     except Exception as e:
-        await ctx.send(f"❌ خطأ في إرسال رسالة الاختبار: {e}")
+        error_msg = await ctx.send(f"❌ خطأ في إرسال رسالة الاختبار: {e}")
+        await error_msg.delete(delay=5)
 
 @bot.command()
 async def welcome_info(ctx):
@@ -651,6 +653,28 @@ async def clear_duplicates(ctx, limit: int = 50):
         await ctx.send(f"❌ خطأ في مسح الرسائل: {e}")
 
 @bot.command()
+@commands.has_permissions(administrator=True)
+async def quick_clean(ctx, count: int = 10):
+    """
+    مسح سريع لآخر رسائل البوت المكررة
+    مثال: !quick_clean 5
+    """
+    try:
+        deleted = 0
+        async for message in ctx.channel.history(limit=count * 2):
+            if message.author == bot.user and deleted < count:
+                await message.delete()
+                deleted += 1
+                await asyncio.sleep(0.3)  # تجنب rate limit
+        
+        if deleted > 0:
+            temp_msg = await ctx.send(f"🧹 تم حذف {deleted} رسالة من البوت")
+            await temp_msg.delete(delay=3)
+    except Exception as e:
+        error_msg = await ctx.send(f"❌ خطأ في الحذف: {e}")
+        await error_msg.delete(delay=3)
+
+@bot.command()
 async def help_welcome(ctx):
     """
     عرض مساعدة أوامر نظام الترحيب
@@ -671,6 +695,7 @@ async def help_welcome(ctx):
         ("!disable_welcome", "تعطيل نظام الترحيب"),
         ("!reload_settings", "إعادة تحميل الإعدادات"),
         ("!clear_duplicates [عدد]", "مسح الرسائل المكررة"),
+        ("!quick_clean [عدد]", "مسح سريع لرسائل البوت"),
         ("!bot_stats", "عرض إحصائيات البوت"),
         ("!developer", "عرض معلومات مطور البوت"),
         ("!help_welcome", "عرض هذه المساعدة")
