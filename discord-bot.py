@@ -20,7 +20,7 @@ DEVELOPER_NAME = "Dev fahad"  # ضع اسمك هنا
 DEVELOPER_ID = 941670030494531584  # ضع معرف حسابك في ديسكورد هنا
 
 # رابط GIF افتراضي
-DEFAULT_GIF_URL = "https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.pinterest.com%2Fpin%2Fwelcome-cover-gif-welcome-banner--51017408272548207%2F&psig=AOvVaw3Q9ex3kr7ufa924i2DHvi8&ust=1759524025176000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCKDmqvqvhpADFQAAAAAdAAAAABAf"
+DEFAULT_GIF_URL = "https://media.discordapp.net/attachments/1264550914056786002/1408009869537054810/bannner.gif?ex=68df8de0&is=68de3c60&hm=81d203da5070347b954bd9f247529dc2b003729cd540d023d33e657dc0a8c4fd&=&width=940&height=528"
 
 def save_welcome_settings(guild_id, channel_id, message, embed_color=0x00bfff, gif_url=None):
     if os.path.exists(WELCOME_SETTINGS_FILE):
@@ -47,7 +47,8 @@ def get_welcome_settings(guild_id):
 @bot.event
 async def on_ready():
     print(f"✅ {bot.user} is now online!")
-    await bot.change_presence(activity=discord.Game(name="Welcome System | !help"))
+    guild_count = len(bot.guilds)
+    await bot.change_presence(activity=discord.Game(name=f"Welcome System | {guild_count} servers | !help_welcome"))
 
 @bot.event
 async def on_member_join(member):
@@ -147,16 +148,30 @@ async def setup_welcome(ctx, channel: discord.TextChannel, *, message: str):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def welcome_gif(ctx, gif_url: str):
+async def welcome_gif(ctx, gif_url: str = None):
     """
     تغيير GIF الترحيب
     مثال: !welcome_gif https://media.giphy.com/media/xyz/giphy.gif
+    أو !welcome_gif default لاستخدام الافتراضي
     """
     settings = get_welcome_settings(ctx.guild.id)
     if not settings:
         await ctx.send("❌ يجب إعداد نظام الترحيب أولاً باستخدام `!setup_welcome`")
         return
     
+    # إذا لم يتم توفير رابط أو كان "default"
+    if not gif_url or gif_url.lower() == "default":
+        gif_url = DEFAULT_GIF_URL
+        action_text = "تم تعيين GIF الافتراضي"
+    else:
+        action_text = "تم تغيير GIF الترحيب"
+    
+    # التحقق من صحة الرابط
+    if not (gif_url.startswith('http://') or gif_url.startswith('https://')):
+        await ctx.send("❌ يرجى إدخال رابط صحيح يبدأ بـ http:// أو https://")
+        return
+    
+    # حفظ الإعدادات الجديدة
     save_welcome_settings(
         ctx.guild.id, 
         settings["channel_id"], 
@@ -166,10 +181,16 @@ async def welcome_gif(ctx, gif_url: str):
     )
     
     embed = discord.Embed(
-        title="✅ تم تغيير GIF الترحيب",
+        title=f"✅ {action_text}",
+        description=f"**الرابط الجديد:** {gif_url}",
         color=0x00ff00
     )
-    embed.set_image(url=gif_url)
+    
+    try:
+        embed.set_image(url=gif_url)
+    except:
+        embed.add_field(name="⚠️ تحذير", value="قد يكون الرابط غير صالح للعرض", inline=False)
+    
     await ctx.send(embed=embed)
 
 @bot.command()
@@ -423,6 +444,41 @@ async def developer(ctx):
     await ctx.send(embed=embed)
 
 @bot.command()
+@commands.has_permissions(administrator=True)
+async def reload_settings(ctx):
+    """
+    إعادة تحميل إعدادات الترحيب (في حالة وجود مشاكل)
+    """
+    try:
+        # قراءة الإعدادات من الملف
+        settings = get_welcome_settings(ctx.guild.id)
+        if not settings:
+            await ctx.send("❌ لا توجد إعدادات ترحيب لإعادة تحميلها")
+            return
+            
+        embed = discord.Embed(
+            title="✅ تم إعادة تحميل الإعدادات",
+            description="تم إعادة تحميل إعدادات الترحيب بنجاح",
+            color=0x00ff00
+        )
+        
+        # عرض الإعدادات المحدثة
+        channel = ctx.guild.get_channel(settings["channel_id"])
+        embed.add_field(name="📢 قناة الترحيب", value=channel.mention if channel else "قناة محذوفة", inline=False)
+        embed.add_field(name="💬 رسالة الترحيب", value=settings["message"], inline=False)
+        embed.add_field(name="🎥 GIF", value=settings.get("gif_url", DEFAULT_GIF_URL), inline=False)
+        
+        # إظهار الـ GIF المحدث
+        gif_url = settings.get("gif_url", DEFAULT_GIF_URL)
+        if gif_url:
+            embed.set_image(url=gif_url)
+            
+        await ctx.send(embed=embed)
+        
+    except Exception as e:
+        await ctx.send(f"❌ خطأ في إعادة تحميل الإعدادات: {e}")
+
+@bot.command()
 async def help_welcome(ctx):
     """
     عرض مساعدة أوامر نظام الترحيب
@@ -441,6 +497,7 @@ async def help_welcome(ctx):
         ("!test_welcome [@عضو]", "اختبار رسالة الترحيب"),
         ("!welcome_info", "عرض الإعدادات الحالية"),
         ("!disable_welcome", "تعطيل نظام الترحيب"),
+        ("!reload_settings", "إعادة تحميل الإعدادات"),
         ("!bot_stats", "عرض إحصائيات البوت"),
         ("!developer", "عرض معلومات مطور البوت"),
         ("!help_welcome", "عرض هذه المساعدة")
