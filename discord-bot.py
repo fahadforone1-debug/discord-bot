@@ -22,7 +22,7 @@ DEVELOPER_NAME = "Dev fahad"  # ضع اسمك هنا
 DEVELOPER_ID = 941670030494531584  # ضع معرف حسابك في ديسكورد هنا
 
 # رابط GIF افتراضي
-DEFAULT_GIF_URL = "https://media.discordapp.net/attachments/1264550914056786002/1408009869537054810/bannner.gif?ex=68df8de0&is=68de3c60&hm=81d203da5070347b954bd9f247529dc2b003729cd540d023d33e657dc0a8c4fd&=&width=940&height=528"
+DEFAULT_GIF_URL = "https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.pinterest.com%2Fpin%2Fsawunn-gif-sawunn-discover-share-gifs--304485624819377454%2F&psig=AOvVaw3GNjLXARRjb5VZRiFS4jK9&ust=1759527120078000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCIjx_bq7hpADFQAAAAAdAAAAABAE"
 
 # نظام منع التكرار السريع (Rate Limiting)
 last_command_time = {}
