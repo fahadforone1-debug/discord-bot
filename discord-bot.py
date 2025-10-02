@@ -20,7 +20,7 @@ DEVELOPER_NAME = "Dev fahad"  # ضع اسمك هنا
 DEVELOPER_ID = 941670030494531584  # ضع معرف حسابك في ديسكورد هنا
 
 # رابط GIF افتراضي
-DEFAULT_GIF_URL = "https://media.discordapp.net/attachments/1264550914056786002/1408009869537054810/bannner.gif?ex=68df8de0&is=68de3c60&hm=81d203da5070347b954bd9f247529dc2b003729cd540d023d33e657dc0a8c4fd&=&width=940&height=528"
+DEFAULT_GIF_URL = "https://www.google.com/url?sa=i&url=https%3A%2F%2Fwww.pinterest.com%2Fpin%2Fwelcome-cover-gif-welcome-banner--51017408272548207%2F&psig=AOvVaw3Q9ex3kr7ufa924i2DHvi8&ust=1759524025176000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCKDmqvqvhpADFQAAAAAdAAAAABAf"
 
 def save_welcome_settings(guild_id, channel_id, message, embed_color=0x00bfff, gif_url=None):
     if os.path.exists(WELCOME_SETTINGS_FILE):
@@ -287,6 +287,19 @@ async def welcome_info(ctx):
         gif_url = settings.get("gif_url")
         if gif_url:
             embed.set_image(url=gif_url)
+            
+        # إضافة معلومات المطور
+        try:
+            developer = bot.get_user(DEVELOPER_ID) or await bot.fetch_user(DEVELOPER_ID)
+            embed.set_footer(
+                text=f"💻 تم تطوير البوت بواسطة {developer.display_name}",
+                icon_url=developer.display_avatar.url
+            )
+        except:
+            embed.set_footer(
+                text=f"💻 تم تطوير البوت بواسطة {DEVELOPER_NAME}",
+                icon_url="https://cdn.discordapp.com/embed/avatars/0.png"
+            )
     
     await ctx.send(embed=embed)
 
@@ -316,6 +329,100 @@ async def disable_welcome(ctx):
         await ctx.send("❌ نظام الترحيب غير مفعل أصلاً")
 
 @bot.command()
+async def bot_stats(ctx):
+    """
+    عرض إحصائيات البوت
+    """
+    embed = discord.Embed(
+        title="📊 إحصائيات البوت",
+        color=0x00bfff
+    )
+    
+    # عدد السيرفرات
+    guild_count = len(bot.guilds)
+    embed.add_field(name="🏰 السيرفرات", value=f"{guild_count} سيرفر", inline=True)
+    
+    # عدد الأعضاء الإجمالي
+    total_members = sum(guild.member_count for guild in bot.guilds)
+    embed.add_field(name="👥 الأعضاء", value=f"{total_members:,} عضو", inline=True)
+    
+    # عدد السيرفرات المفعل بها نظام الترحيب
+    if os.path.exists(WELCOME_SETTINGS_FILE):
+        with open(WELCOME_SETTINGS_FILE, "r") as f:
+            data = json.load(f)
+        active_welcomes = len(data)
+    else:
+        active_welcomes = 0
+    
+    embed.add_field(name="✅ نظام الترحيب مفعل", value=f"{active_welcomes} سيرفر", inline=True)
+    
+    # قائمة السيرفرات (أول 10 فقط لتجنب الرسائل الطويلة)
+    guild_list = []
+    for i, guild in enumerate(bot.guilds[:10], 1):
+        guild_list.append(f"{i}. **{guild.name}** ({guild.member_count:,} عضو)")
+    
+    if len(bot.guilds) > 10:
+        guild_list.append(f"... و {len(bot.guilds) - 10} سيرفر آخر")
+    
+    embed.add_field(
+        name="🏰 قائمة السيرفرات:",
+        value="\n".join(guild_list) if guild_list else "لا توجد سيرفرات",
+        inline=False
+    )
+    
+    embed.set_footer(text=f"Powered by {DEVELOPER_NAME}")
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def developer(ctx):
+    """
+    عرض معلومات مطور البوت
+    """
+    try:
+        developer = bot.get_user(DEVELOPER_ID) or await bot.fetch_user(DEVELOPER_ID)
+        
+        embed = discord.Embed(
+            title="👨‍💻 معلومات المطور",
+            color=0x7289da
+        )
+        
+        embed.set_thumbnail(url=developer.display_avatar.url)
+        embed.add_field(name="🔰 اسم المطور", value=developer.display_name, inline=True)
+        embed.add_field(name="🏷️ اسم المستخدم", value=f"{developer.name}#{developer.discriminator}", inline=True)
+        embed.add_field(name="🆔 معرف المطور", value=DEVELOPER_ID, inline=True)
+        embed.add_field(name="📅 انضم لديسكورد", value=developer.created_at.strftime("%Y-%m-%d"), inline=True)
+        embed.add_field(name="🤖 اسم البوت", value=bot.user.name, inline=True)
+        embed.add_field(name="🌟 نوع البوت", value="Welcome System Bot", inline=True)
+        
+        embed.add_field(
+            name="📝 وصف البوت:",
+            value="بوت ترحيب متقدم يدعم عدة سيرفرات مع إعدادات منفصلة لكل سيرفر",
+            inline=False
+        )
+        
+        embed.set_footer(
+            text=f"شكراً لاستخدام البوت! • {datetime.datetime.now().strftime('%Y-%m-%d')}",
+            icon_url=bot.user.display_avatar.url
+        )
+        
+    except Exception as e:
+        embed = discord.Embed(
+            title="👨‍💻 معلومات المطور",
+            color=0x7289da
+        )
+        embed.add_field(name="🔰 اسم المطور", value=DEVELOPER_NAME, inline=True)
+        embed.add_field(name="🆔 معرف المطور", value=DEVELOPER_ID, inline=True)
+        embed.add_field(name="🤖 اسم البوت", value=bot.user.name, inline=True)
+        embed.add_field(
+            name="📝 وصف البوت:",
+            value="بوت ترحيب متقدم يدعم عدة سيرفرات مع إعدادات منفصلة لكل سيرفر",
+            inline=False
+        )
+        embed.set_footer(text=f"Error loading developer info: {e}")
+    
+    await ctx.send(embed=embed)
+
+@bot.command()
 async def help_welcome(ctx):
     """
     عرض مساعدة أوامر نظام الترحيب
@@ -334,6 +441,8 @@ async def help_welcome(ctx):
         ("!test_welcome [@عضو]", "اختبار رسالة الترحيب"),
         ("!welcome_info", "عرض الإعدادات الحالية"),
         ("!disable_welcome", "تعطيل نظام الترحيب"),
+        ("!bot_stats", "عرض إحصائيات البوت"),
+        ("!developer", "عرض معلومات مطور البوت"),
         ("!help_welcome", "عرض هذه المساعدة")
     ]
     
@@ -351,6 +460,19 @@ async def help_welcome(ctx):
         value="البوت يرسل رسائل الترحيب **فقط** في القناة المحددة عبر أمر `!setup_welcome`",
         inline=False
     )
+    
+    # إضافة معلومات المطور
+    try:
+        developer = bot.get_user(DEVELOPER_ID) or await bot.fetch_user(DEVELOPER_ID)
+        embed.set_footer(
+            text=f"💻 تم تطوير البوت بواسطة {developer.display_name} ({DEVELOPER_NAME})",
+            icon_url=developer.display_avatar.url
+        )
+    except:
+        embed.set_footer(
+            text=f"💻 تم تطوير البوت بواسطة {DEVELOPER_NAME}",
+            icon_url="https://cdn.discordapp.com/embed/avatars/0.png"
+        )
     
     await ctx.send(embed=embed)
 
