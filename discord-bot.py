@@ -318,6 +318,18 @@ async def test_welcome(ctx, member: discord.Member = None):
     اختبار رسالة الترحيب
     مثال: !test_welcome @عضو
     """
+    # التحقق من rate limiting لمنع التكرار السريع
+    can_use, wait_time = check_rate_limit(ctx.author.id, "test_welcome", 5)
+    if not can_use:
+        embed = discord.Embed(
+            title="⏰ يرجى الانتظار",
+            description=f"يرجى الانتظار {wait_time} ثانية قبل اختبار الترحيب مرة أخرى",
+            color=0xffaa00
+        )
+        msg = await ctx.send(embed=embed)
+        await msg.delete(delay=3)
+        return
+    
     if not member:
         member = ctx.author
     
@@ -331,9 +343,9 @@ async def test_welcome(ctx, member: discord.Member = None):
         await ctx.send("❌ قناة الترحيب غير موجودة")
         return
     
-    # إنشاء embed الاختبار (نسخة مبسطة من on_member_join)
+    # إنشاء embed الاختبار (نفس تصميم الترحيب الأصلي)
     embed = discord.Embed(
-        title=f"🧪 Test Welcome - {member.guild.name}!",
+        title=f"🎉 Welcome to {member.guild.name}!",
         description=settings["message"].replace("{user}", member.mention).replace("{guild}", member.guild.name).replace("{count}", str(member.guild.member_count)),
         color=settings.get("embed_color", 0x00bfff)
     )
@@ -346,7 +358,7 @@ async def test_welcome(ctx, member: discord.Member = None):
     # معلومات السيرفر
     embed.add_field(name="👥 Member Count", value=member.guild.member_count, inline=True)
     embed.add_field(name="🏆 You're Member", value=f"#{member.guild.member_count}", inline=True)
-    embed.add_field(name="🌟 Join Method", value="Test Mode", inline=True)
+    embed.add_field(name="🌟 Join Method", value="Direct Join", inline=True)
     
     # صورة العضو
     embed.set_thumbnail(url=member.display_avatar.url)
